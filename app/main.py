@@ -10,10 +10,15 @@ from app.config import WEBHOOK_SECRET
 from app.models import init_db, get_connection
 from app.storage import insert_message, fetch_messages, fetch_stats
 from app.logging_utils import log_event
+from app.metrics import router as metrics_router  # 👈 STEP 2.2 ADDED
+from app.logging_utils import setup_logging
+setup_logging()
 
 app = FastAPI()
 
-
+# --------------------
+# Startup
+# --------------------
 @app.on_event("startup")
 def startup_event():
     init_db()
@@ -152,3 +157,9 @@ def health_ready():
         raise HTTPException(status_code=503, detail="Database not ready")
 
     return {"status": "ready"}
+
+
+# --------------------
+# Metrics (STEP 2.2)
+# --------------------
+app.include_router(metrics_router)
