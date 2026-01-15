@@ -34,7 +34,6 @@ def insert_message(message: dict) -> bool:
         conn.commit()
         return True
     except sqlite3.IntegrityError:
-        # Duplicate message_id
         return False
     finally:
         conn.close()
@@ -69,20 +68,20 @@ def fetch_messages(
     if conditions:
         where_clause = "WHERE " + " AND ".join(conditions)
 
-    total_query = f"SELECT COUNT(*) FROM messages {where_clause}"
-    cursor.execute(total_query, params)
+    cursor.execute(f"SELECT COUNT(*) FROM messages {where_clause}", params)
     total = cursor.fetchone()[0]
 
-    data_query = f"""
+    cursor.execute(
+        f"""
         SELECT message_id, from_msisdn, to_msisdn, ts, text
         FROM messages
         {where_clause}
         ORDER BY ts ASC, message_id ASC
         LIMIT ? OFFSET ?
-    """
-    cursor.execute(data_query, params + [limit, offset])
+        """,
+        params + [limit, offset],
+    )
     rows = cursor.fetchall()
-
     conn.close()
 
     data = [
@@ -97,3 +96,43 @@ def fetch_messages(
     ]
 
     return data, total
+
+
+def fetch_stats():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM messages")
+    total_messages = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(DISTINCT from_msisdn) FROM messages")
+    senders_count = cursor.fetchone()[0]
+
+    cursor.execute(
+        """
+        SELECT from_msisdn, COUNT(*) as cnt
+        FROM messages
+        GROUP BY from_msisdn
+        ORDER BY cnt DESC
+        LIMIT 10
+        """
+    )
+    messages_per_sender = [
+        {"from": row[0], "count": row[1]}
+        for row in cursor.fetchall()
+    ]
+
+    cursor.execute("SELECT MIN(ts), MAX(ts) FROM messages")
+    row = cursor.fetchone()
+    first_message_ts = row[0]
+    last_message_ts = row[1]
+
+    conn.close()
+
+    return {
+        "total_messages": total_messages,
+        "senders_count": senders_count,
+        "messages_per_sender": messages_per_sender,
+        "first_message_ts": first_message_ts,
+        "last_message_ts": last_message_ts,
+    }

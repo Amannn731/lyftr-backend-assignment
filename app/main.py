@@ -8,7 +8,7 @@ import uuid
 
 from app.config import WEBHOOK_SECRET
 from app.models import init_db, get_connection
-from app.storage import insert_message, fetch_messages
+from app.storage import insert_message, fetch_messages, fetch_stats
 from app.logging_utils import log_event
 
 app = FastAPI()
@@ -102,9 +102,6 @@ async def webhook(
     return {"status": "ok"}
 
 
-# --------------------
-# Messages listing
-# --------------------
 @app.get("/messages")
 def list_messages(
     limit: int = Query(50, ge=1, le=100),
@@ -127,6 +124,11 @@ def list_messages(
         "limit": limit,
         "offset": offset,
     }
+
+
+@app.get("/stats")
+def stats():
+    return fetch_stats()
 
 
 # --------------------
