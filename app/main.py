@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Header, HTTPException
+from fastapi import FastAPI, Request, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 import hmac
@@ -8,7 +8,7 @@ import uuid
 
 from app.config import WEBHOOK_SECRET
 from app.models import init_db, get_connection
-from app.storage import insert_message
+from app.storage import insert_message, fetch_messages
 from app.logging_utils import log_event
 
 app = FastAPI()
@@ -58,7 +58,6 @@ async def webhook(
     request_id = str(uuid.uuid4())
     body = await request.body()
 
-    # Signature check
     if not x_signature or not verify_signature(body, x_signature):
         log_event(
             level="ERROR",
@@ -70,7 +69,6 @@ async def webhook(
         )
         raise HTTPException(status_code=401, detail="invalid signature")
 
-    # Payload validation
     try:
         payload = WebhookMessage.parse_raw(body)
     except Exception:
@@ -85,7 +83,6 @@ async def webhook(
         raise
 
     data = payload.dict(by_alias=True)
-
     inserted = insert_message(data)
 
     latency_ms = int((time.time() - start_time) * 1000)
@@ -103,6 +100,33 @@ async def webhook(
     )
 
     return {"status": "ok"}
+
+
+# --------------------
+# Messages listing
+# --------------------
+@app.get("/messages")
+def list_messages(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    from_: Optional[str] = Query(None, alias="from"),
+    since: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    data, total = fetch_messages(
+        limit=limit,
+        offset=offset,
+        from_msisdn=from_,
+        since=since,
+        q=q,
+    )
+
+    return {
+        "data": data,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 # --------------------
