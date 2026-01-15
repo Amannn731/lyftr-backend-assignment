@@ -24,7 +24,7 @@ def startup_event():
 # --------------------
 class WebhookMessage(BaseModel):
     message_id: str = Field(..., min_length=1)
-    from_: str = Field(..., alias="from", regex=r"^\+\d+$")
+    from_: str = Field(..., alias="from", pattern=r"^\+\d+$")
     to: str = Field(..., regex=r"^\+\d+$")
     ts: str
     text: Optional[str] = Field(None, max_length=4096)
